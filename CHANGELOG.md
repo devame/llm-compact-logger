@@ -5,6 +5,95 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2025-11-08
+
+### Added - Major Enhancement Suite
+This release adds 7 powerful enhancements that transform the logger into a comprehensive debugging tool while maintaining the core token-efficiency goal.
+
+#### 1. Inline Code Context ⭐ HIGHEST ROI
+- Automatically extracts failing line of code with surrounding context
+- Shows 3 lines before and after the failure point
+- Zero coupling - only reads files that test frameworks already provide
+- Configurable context window size
+
+#### 2. Smart Diff with Structure Analysis
+- Intelligent actual vs expected comparison
+- Automatic type mismatch detection
+- Structure difference analysis for objects and arrays
+- AI-powered hints about what went wrong (e.g., "Type mismatch: got array but expected object")
+- Missing/extra property detection
+- Works with Vitest, Jest, and Chai assertion libraries
+
+#### 3. Enhanced Stack Traces
+- Function names extracted from stack frames
+- Actual source code shown for each frame
+- Smart path shortening for readability
+- Distinguishes test files from source files
+- Configurable frame limit and code truncation
+
+#### 4. Persistent Index Database ⭐ HIGH VALUE
+- SQLite-based test history tracking
+- Flakiness detection with pass rate calculation
+- Find similar failures across test runs
+- Git integration (commit hash and branch tracking)
+- Automatic cleanup of old data (configurable retention)
+- Optional dependency on `better-sqlite3` with graceful degradation
+
+#### 5. Smart Root Cause Analysis
+- Pattern matching across multiple failures
+- Groups failures by error type with confidence scores
+- Actionable suggestions for common error patterns
+- Identifies common source files across failures
+- Detects: undefined property access, type mismatches, array length issues, timeouts, and more
+- Zero coupling - analyzes existing error data
+
+#### 6. Function Coverage Map
+- Integrates with Vitest V8 coverage
+- Shows which functions were executed during test
+- Builds execution path from stack trace + coverage
+- Coverage summary statistics
+- Zero additional instrumentation needed
+
+#### 7. Quick Links and IDE Integration
+- Generates VSCode, IntelliJ IDEA, and file:// links
+- Click to jump directly to failing line
+- Git blame integration showing last change
+- Links to related failing tests
+- Optional git tracking with graceful degradation
+
+### Enhanced
+
+- **VitestReporter**: Now applies all enhancements automatically
+- **Configuration**: All enhancements enabled by default (except persistent index)
+- **Output Format**: Enhanced failures include code context, smart diffs, enhanced stacks, and more
+- **Console Output**: Now shows root cause analysis summary
+- **Error Analysis**: Root cause patterns displayed in console with suggestions
+
+### Configuration
+
+- New `enhancements` option in VitestReporter
+- Each enhancement can be enabled/disabled independently
+- Detailed configuration options for each enhancement
+- Backward compatible - all options are optional
+
+### Examples
+
+- `vitest-with-enhancements.config.js` - Complete configuration example
+- `vitest-minimal-enhancements.config.js` - Minimal setup example
+
+### Dependencies
+
+- Added optional dependency: `better-sqlite3` ^9.0.0 (for persistent index)
+- No breaking changes to existing dependencies
+
+### Technical Details
+
+- All enhancements maintain low/zero coupling with test frameworks
+- Graceful degradation when optional dependencies unavailable
+- Enhancements are composable and can be used independently
+- No performance impact when disabled
+- File operations are safe with try-catch error handling
+
 ## [0.1.0] - 2025-11-08
 
 ### Added

@@ -17,6 +17,7 @@
 
 import { BaseAdapter } from './base-adapter.js';
 import { CompactLogger } from '../compact-logger.js';
+import { createEnhancers } from '../enhancements/index.js';
 
 export class VitestAdapter extends BaseAdapter {
   convertFailure(vitestTask) {
@@ -136,15 +137,29 @@ export class VitestAdapter extends BaseAdapter {
  */
 export class VitestReporter {
   constructor(options = {}) {
-    this.options = options;
+    this.options = {
+      outputDir: options.outputDir || '.',
+      // Enhancement options
+      enhancements: {
+        codeContext: options.enhancements?.codeContext !== false, // Default enabled
+        stack: options.enhancements?.stack !== false, // Default enabled
+        diff: options.enhancements?.diff !== false, // Default enabled
+        rootCause: options.enhancements?.rootCause !== false, // Default enabled
+        coverage: options.enhancements?.coverage !== false, // Default enabled
+        links: options.enhancements?.links !== false, // Default enabled
+        persistentIndex: options.enhancements?.persistentIndex || { enabled: false }
+      },
+      ...options
+    };
     this.logger = null;
     this.adapter = null;
+    this.enhancers = null;
   }
 
   onInit() {
     // Create logger and adapter when Vitest initializes
     this.logger = new CompactLogger({
-      outputDir: this.options.outputDir || '.',
+      outputDir: this.options.outputDir,
       metadata: {
         framework: 'vitest',
         commit: this.getGitCommit()
@@ -153,6 +168,18 @@ export class VitestReporter {
     });
 
     this.adapter = new VitestAdapter(this.logger);
+
+    // Create enhancers
+    this.enhancers = createEnhancers({
+      outputDir: this.options.outputDir,
+      codeContext: this.options.enhancements.codeContext,
+      stack: this.options.enhancements.stack,
+      diff: this.options.enhancements.diff,
+      rootCause: this.options.enhancements.rootCause,
+      coverage: this.options.enhancements.coverage,
+      links: this.options.enhancements.links,
+      persistentIndex: this.options.enhancements.persistentIndex
+    });
   }
 
   async onFinished(files = [], errors = []) {
@@ -164,8 +191,86 @@ export class VitestReporter {
     // Process all test results
     const results = this.adapter.processFiles(files);
 
-    // Log all failures and passes
-    for (const failure of results.failures) {
+    // Apply enhancements to failures
+    let enhancedFailures = results.failures;
+
+    if (this.enhancers) {
+      // 1. Inline code context (highest ROI)
+      if (this.enhancers.codeContext) {
+        enhancedFailures = this.enhancers.codeContext.enhanceAll(enhancedFailures);
+      }
+
+      // 2. Smart diff formatting
+      if (this.enhancers.diff) {
+        enhancedFailures = this.enhancers.diff.enhanceAll(enhancedFailures);
+      }
+
+      // 3. Enhanced stack traces
+      if (this.enhancers.stack) {
+        enhancedFailures = this.enhancers.stack.enhanceAll(enhancedFailures);
+      }
+
+      // 4. Coverage integration (async)
+      if (this.enhancers.coverage) {
+        enhancedFailures = await this.enhancers.coverage.enhanceAll(enhancedFailures);
+      }
+
+      // 5. Quick links
+      if (this.enhancers.links) {
+        enhancedFailures = this.enhancers.links.enhanceAll(enhancedFailures, this.enhancers.index);
+      }
+
+      // 6. Root cause analysis (on all enhanced failures)
+      let rootCauses = null;
+      if (this.enhancers.rootCause && enhancedFailures.length > 0) {
+        rootCauses = this.enhancers.rootCause.analyze(enhancedFailures);
+      }
+
+      // 7. Persistent index tracking
+      if (this.enhancers.index) {
+        const summary = this.adapter.extractSummary(files);
+        const runId = this.enhancers.index.recordTestRun(summary, {
+          framework: 'vitest',
+          dur: Date.now()
+        });
+
+        if (runId) {
+          // Record all results (passes and failures)
+          const allTests = [
+            ...enhancedFailures,
+            ...results.passes.map(p => ({ ...p, e: null }))
+          ];
+          this.enhancers.index.recordTestResults(runId, allTests);
+
+          // Enhance failures with historical data
+          enhancedFailures = enhancedFailures.map(failure => {
+            const history = this.enhancers.index.getTestHistory(failure.t, 5);
+            const flaky = this.enhancers.index.getFlakiness(failure.t);
+
+            if (history.length > 0 || flaky) {
+              return {
+                ...failure,
+                history: {
+                  lastPassed: history.find(h => h.status === 'pass')?.timestamp || null,
+                  failCount: history.filter(h => h.status === 'fail').length,
+                  totalRuns: history.length,
+                  flaky
+                }
+              };
+            }
+            return failure;
+          });
+        }
+      }
+
+      // Add root cause analysis to logger metadata
+      if (rootCauses && rootCauses.length > 0) {
+        this.logger.metadata.rootCauses = rootCauses;
+      }
+    }
+
+    // Log all enhanced failures and passes
+    for (const failure of enhancedFailures) {
       this.logger.logFailure(failure);
     }
 
@@ -189,6 +294,18 @@ export class VitestReporter {
       console.log('\n🔍 Quick Analysis:');
       console.log(`   Most failing: ${this.logger.getMostFailingFile(byFile)}`);
       console.log(`   Common error: ${this.logger.getMostCommonError(this.logger.failures)}`);
+
+      // Show root cause summary if available
+      if (this.logger.metadata.rootCauses && this.logger.metadata.rootCauses.length > 0) {
+        const topCause = this.logger.metadata.rootCauses[0];
+        console.log(`   Root cause: ${topCause.pattern} (${topCause.confidence * 100}% confidence)`);
+        console.log(`   Suggestion: ${topCause.suggestion}`);
+      }
+    }
+
+    // Cleanup
+    if (this.enhancers?.index) {
+      this.enhancers.index.close();
     }
   }
 

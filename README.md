@@ -279,14 +279,220 @@ See the `examples/` directory for:
 - `vitest-usage.js` - Vitest configuration
 - `custom-adapter.js` - Creating your own adapter
 
+## Enhancements
+
+The logger now includes 7 powerful enhancements that significantly improve debugging capabilities:
+
+### 1. Inline Code Context ⭐ HIGHEST ROI
+**Zero coupling** - Automatically extracts the failing line of code with surrounding context.
+
+```javascript
+{
+  "code": {
+    "fail": "expect(ast.statements[0].parameters[0].value.name).toBe('&INPUT')",
+    "ctx": [
+      "const code = 'PGM PARM(&INPUT)';",
+      "const ast = parse(code);",
+      "expect(ast.statements[0].parameters[0].value.name).toBe('&INPUT');"
+    ],
+    "line": { "start": 26, "failing": 28, "end": 31 }
+  }
+}
+```
+
+### 2. Smart Diff with Structure Analysis
+**Low coupling** - Intelligently formats actual vs expected with hints about what went wrong.
+
+```javascript
+{
+  "e": {
+    "type": "TypeError",
+    "msg": "Cannot read properties of undefined (reading 'name')",
+    "actual": "parameters[0] = [{type:'VariableReference', name:'&INPUT'}]",
+    "expected": "parameters[0].value.name",
+    "hint": "Accessing .value on array - structure mismatch"
+  }
+}
+```
+
+### 3. Enhanced Stack Traces
+**Zero coupling** - Shows function names and actual source code for each stack frame.
+
+```javascript
+{
+  "stk": [
+    {
+      "fn": "expect",
+      "at": "parser.test.js:28",
+      "code": "expect(ast.statements[0].parameters...",
+      "test": true
+    },
+    {
+      "fn": "parse",
+      "at": "index.js:76",
+      "code": "return parser.match(code)",
+      "test": false
+    }
+  ]
+}
+```
+
+### 4. Persistent Index Database ⭐ HIGH VALUE
+**Low coupling** - Stores test history in SQLite for trend analysis and flakiness detection.
+
+```javascript
+{
+  "history": {
+    "lastPassed": "2025-01-07T10:23:45Z",
+    "failCount": 3,
+    "totalRuns": 5,
+    "flaky": {
+      "passRate": "40.0",
+      "isFlaky": true
+    }
+  },
+  "similar": [
+    { "test": "should parse DCL with parameters", "occurrences": 4 }
+  ]
+}
+```
+
+**Note**: Requires `better-sqlite3` package (optional dependency).
+
+### 5. Smart Root Cause Analysis
+**Zero coupling** - Analyzes failure patterns and provides actionable suggestions.
+
+```javascript
+{
+  "rootCauses": [
+    {
+      "pattern": "Accessing property 'name' on undefined",
+      "confidence": 0.95,
+      "affectedTests": ["should parse PGM", "should parse DCL"],
+      "count": 2,
+      "suggestion": "Check if object exists before accessing property"
+    }
+  ]
+}
+```
+
+### 6. Function Coverage Map
+**Low coupling** - Integrates with V8 coverage to show execution paths.
+
+```javascript
+{
+  "coverage": {
+    "functions": [
+      { "name": "parse", "file": "js/index.js", "line": 76 },
+      { "name": "matchPgmStatement", "file": "js/grammar.js", "line": 123 }
+    ],
+    "executionPath": [
+      { "fn": "parse", "file": "js/index.js:76", "fromStack": true }
+    ]
+  }
+}
+```
+
+**Note**: Requires Vitest coverage to be enabled.
+
+### 7. Quick Links and IDE Integration
+**Low coupling** - Generates clickable links for VSCode, IntelliJ, and more.
+
+```javascript
+{
+  "links": {
+    "test": {
+      "label": "parser.test.js",
+      "vscode": "vscode://file/.../parser.test.js:28",
+      "idea": "idea://open?file=...&line=28"
+    },
+    "source": {
+      "label": "index.js",
+      "vscode": "vscode://file/.../index.js:76"
+    },
+    "lastChange": "abc123f 2 days ago Fix parser structure"
+  }
+}
+```
+
+## Configuration
+
+### All Enhancements Enabled
+
+```javascript
+// vitest.config.js
+import { VitestReporter } from 'llm-compact-logger/adapters/vitest';
+
+export default {
+  test: {
+    coverage: {
+      enabled: true,
+      provider: 'v8',
+      reporter: ['json'],
+      reportsDirectory: '.coverage'
+    },
+    reporters: [
+      'default',
+      new VitestReporter({
+        outputDir: './debug',
+        enhancements: {
+          codeContext: true,        // Inline code - HIGHEST ROI
+          diff: true,               // Smart diff formatting
+          stack: true,              // Enhanced stack traces
+          rootCause: true,          // Pattern analysis
+          coverage: true,           // V8 coverage integration
+          links: true,              // IDE links + git blame
+          persistentIndex: {        // Historical tracking
+            enabled: true,
+            retentionDays: 30
+          }
+        }
+      })
+    ]
+  }
+};
+```
+
+### Minimal Configuration (Zero Extra Dependencies)
+
+```javascript
+new VitestReporter({
+  outputDir: './debug'
+  // All enhancements except coverage and persistentIndex are enabled by default
+})
+```
+
+### Selective Enhancements
+
+```javascript
+new VitestReporter({
+  outputDir: './debug',
+  enhancements: {
+    codeContext: true,
+    diff: true,
+    stack: true,
+    rootCause: false,      // Disable
+    coverage: false,       // Disable
+    links: false,          // Disable
+    persistentIndex: { enabled: false }
+  }
+})
+```
+
 ## Roadmap
 
 - [x] Core logger with token optimization
 - [x] Vitest adapter
 - [x] Jest adapter
+- [x] Inline code context
+- [x] Smart diff with structure analysis
+- [x] Enhanced stack traces
+- [x] Persistent index (SQLite)
+- [x] Root cause analysis
+- [x] Coverage integration (V8)
+- [x] Quick links and IDE integration
 - [ ] Mocha adapter
 - [ ] Playwright adapter
-- [ ] SQLite historical storage
 - [ ] LLM query interface
 - [ ] Diff-based reporting (state changes only)
 - [ ] Web UI for report visualization
