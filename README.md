@@ -497,6 +497,20 @@ new VitestReporter({
 - [ ] Diff-based reporting (state changes only)
 - [ ] Web UI for report visualization
 
+## Claude Code Skills
+
+Want to supercharge your debugging workflow with Claude? Check out [SKILLS.md](./SKILLS.md) for:
+- **Ready-to-use Skills** for analyzing debug reports, configuring enhancements, and creating adapters
+- **Complete templates** with proper frontmatter and structure
+- **Step-by-step guides** for packaging and installation
+- **Best practices** for creating your own custom Skills
+
+Create Skills that automatically help Claude:
+- Analyze compact logger JSON output
+- Configure the 7 enhancement features
+- Build custom framework adapters
+- Apply your domain-specific debugging patterns
+
 ## Contributing
 
 Contributions welcome! Please:
@@ -504,6 +518,8 @@ Contributions welcome! Please:
 2. Create a feature branch
 3. Add tests for new functionality
 4. Submit a pull request
+
+**Share your Skills:** If you create useful Skills for llm-compact-logger, submit them in a `skills/` directory!
 
 ## License
 
