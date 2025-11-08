@@ -169,17 +169,35 @@ export class VitestReporter {
 
     this.adapter = new VitestAdapter(this.logger);
 
-    // Create enhancers
-    this.enhancers = createEnhancers({
-      outputDir: this.options.outputDir,
-      codeContext: this.options.enhancements.codeContext,
-      stack: this.options.enhancements.stack,
-      diff: this.options.enhancements.diff,
-      rootCause: this.options.enhancements.rootCause,
-      coverage: this.options.enhancements.coverage,
-      links: this.options.enhancements.links,
-      persistentIndex: this.options.enhancements.persistentIndex
-    });
+    // Enhancers will be loaded lazily in onFinished (async)
+    this.enhancers = null;
+    this.enhancersPromise = null;
+  }
+
+  /**
+   * Load enhancers lazily (async operation)
+   * @returns {Promise<Object>} Enhancers object
+   */
+  async loadEnhancers() {
+    if (this.enhancers) {
+      return this.enhancers;
+    }
+
+    if (!this.enhancersPromise) {
+      this.enhancersPromise = createEnhancers({
+        outputDir: this.options.outputDir,
+        codeContext: this.options.enhancements.codeContext,
+        stack: this.options.enhancements.stack,
+        diff: this.options.enhancements.diff,
+        rootCause: this.options.enhancements.rootCause,
+        coverage: this.options.enhancements.coverage,
+        links: this.options.enhancements.links,
+        persistentIndex: this.options.enhancements.persistentIndex
+      });
+    }
+
+    this.enhancers = await this.enhancersPromise;
+    return this.enhancers;
   }
 
   async onFinished(files = [], errors = []) {
@@ -191,45 +209,48 @@ export class VitestReporter {
     // Process all test results
     const results = this.adapter.processFiles(files);
 
+    // Load enhancers (async, first time only)
+    const enhancers = await this.loadEnhancers();
+
     // Apply enhancements to failures
     let enhancedFailures = results.failures;
 
-    if (this.enhancers) {
+    if (enhancers && Object.keys(enhancers).length > 0) {
       // 1. Inline code context (highest ROI)
-      if (this.enhancers.codeContext) {
-        enhancedFailures = this.enhancers.codeContext.enhanceAll(enhancedFailures);
+      if (enhancers.codeContext) {
+        enhancedFailures = enhancers.codeContext.enhanceAll(enhancedFailures);
       }
 
       // 2. Smart diff formatting
-      if (this.enhancers.diff) {
-        enhancedFailures = this.enhancers.diff.enhanceAll(enhancedFailures);
+      if (enhancers.diff) {
+        enhancedFailures = enhancers.diff.enhanceAll(enhancedFailures);
       }
 
       // 3. Enhanced stack traces
-      if (this.enhancers.stack) {
-        enhancedFailures = this.enhancers.stack.enhanceAll(enhancedFailures);
+      if (enhancers.stack) {
+        enhancedFailures = enhancers.stack.enhanceAll(enhancedFailures);
       }
 
       // 4. Coverage integration (async)
-      if (this.enhancers.coverage) {
-        enhancedFailures = await this.enhancers.coverage.enhanceAll(enhancedFailures);
+      if (enhancers.coverage) {
+        enhancedFailures = await enhancers.coverage.enhanceAll(enhancedFailures);
       }
 
       // 5. Quick links
-      if (this.enhancers.links) {
-        enhancedFailures = this.enhancers.links.enhanceAll(enhancedFailures, this.enhancers.index);
+      if (enhancers.links) {
+        enhancedFailures = enhancers.links.enhanceAll(enhancedFailures, enhancers.index);
       }
 
       // 6. Root cause analysis (on all enhanced failures)
       let rootCauses = null;
-      if (this.enhancers.rootCause && enhancedFailures.length > 0) {
-        rootCauses = this.enhancers.rootCause.analyze(enhancedFailures);
+      if (enhancers.rootCause && enhancedFailures.length > 0) {
+        rootCauses = enhancers.rootCause.analyze(enhancedFailures);
       }
 
       // 7. Persistent index tracking
-      if (this.enhancers.index) {
+      if (enhancers.index) {
         const summary = this.adapter.extractSummary(files);
-        const runId = this.enhancers.index.recordTestRun(summary, {
+        const runId = enhancers.index.recordTestRun(summary, {
           framework: 'vitest',
           dur: Date.now()
         });
@@ -240,12 +261,12 @@ export class VitestReporter {
             ...enhancedFailures,
             ...results.passes.map(p => ({ ...p, e: null }))
           ];
-          this.enhancers.index.recordTestResults(runId, allTests);
+          enhancers.index.recordTestResults(runId, allTests);
 
           // Enhance failures with historical data
           enhancedFailures = enhancedFailures.map(failure => {
-            const history = this.enhancers.index.getTestHistory(failure.t, 5);
-            const flaky = this.enhancers.index.getFlakiness(failure.t);
+            const history = enhancers.index.getTestHistory(failure.t, 5);
+            const flaky = enhancers.index.getFlakiness(failure.t);
 
             if (history.length > 0 || flaky) {
               return {
@@ -304,8 +325,8 @@ export class VitestReporter {
     }
 
     // Cleanup
-    if (this.enhancers?.index) {
-      this.enhancers.index.close();
+    if (enhancers?.index) {
+      enhancers.index.close();
     }
   }
 
