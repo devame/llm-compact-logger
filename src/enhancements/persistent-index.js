@@ -193,7 +193,7 @@ export class PersistentIndex {
 
           insert.run(
             runId,
-            test.t,
+            test.t || 'unknown',  // Ensure test name is never null
             test.f?.split(':')[0] || 'unknown',
             test.e ? 'fail' : 'pass',
             test.d || 0,

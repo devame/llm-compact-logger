@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2025-11-08
+
+### Fixed
+
+**Database NOT NULL constraint violation**
+
+- Fixed `NOT NULL constraint failed: results.test_name` error when recording test results
+- Added fallback value `'unknown'` for `test.t` (test name) when undefined/null
+
+### Technical Details
+
+**Root Cause:** The `recordTestResults()` method inserted `test.t` directly without checking if it's null/undefined, but the database schema requires `test_name` to be NOT NULL.
+
+**Solution:** Added `test.t || 'unknown'` fallback to ensure test name is never null before database insertion.
+
+**Impact:** Persistent index now handles edge cases where test objects don't have a name property.
+
 ## [0.2.2] - 2025-11-08
 
 ### Fixed
