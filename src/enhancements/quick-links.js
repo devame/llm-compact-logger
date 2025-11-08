@@ -21,9 +21,9 @@ export class QuickLinksGenerator {
    * Generate quick links for a failure
    * @param {Object} failure - Standardized failure object
    * @param {Object} [index] - Optional persistent index for related tests
-   * @returns {Object} Links object
+   * @returns {Promise<Object>} Links object
    */
-  generate(failure, index = null) {
+  async generate(failure, index = null) {
     const links = {};
 
     // Link to test file
@@ -53,7 +53,7 @@ export class QuickLinksGenerator {
     // Related tests (if index available)
     if (index && failure.errorHash) {
       try {
-        const similar = index.findSimilarFailures(failure.errorHash);
+        const similar = await index.findSimilarFailures(failure.errorHash);
         if (similar && similar.length > 0) {
           links.relatedTests = similar
             .slice(0, this.maxRelatedTests)
@@ -171,13 +171,15 @@ export class QuickLinksGenerator {
    * Enhance multiple failures with links
    * @param {Array} failures - Array of failures
    * @param {Object} [index] - Optional persistent index
-   * @returns {Array} Enhanced failures
+   * @returns {Promise<Array>} Enhanced failures
    */
-  enhanceAll(failures, index = null) {
-    return failures.map(failure => {
-      const links = this.generate(failure, index);
-      return links ? { ...failure, links } : failure;
-    });
+  async enhanceAll(failures, index = null) {
+    return Promise.all(
+      failures.map(async (failure) => {
+        const links = await this.generate(failure, index);
+        return links ? { ...failure, links } : failure;
+      })
+    );
   }
 }
 

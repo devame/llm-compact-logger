@@ -238,7 +238,7 @@ export class VitestReporter {
 
       // 5. Quick links
       if (enhancers.links) {
-        enhancedFailures = enhancers.links.enhanceAll(enhancedFailures, enhancers.index);
+        enhancedFailures = await enhancers.links.enhanceAll(enhancedFailures, enhancers.index);
       }
 
       // 6. Root cause analysis (on all enhanced failures)
@@ -250,7 +250,7 @@ export class VitestReporter {
       // 7. Persistent index tracking
       if (enhancers.index) {
         const summary = this.adapter.extractSummary(files);
-        const runId = enhancers.index.recordTestRun(summary, {
+        const runId = await enhancers.index.recordTestRun(summary, {
           framework: 'vitest',
           dur: Date.now()
         });
@@ -261,26 +261,28 @@ export class VitestReporter {
             ...enhancedFailures,
             ...results.passes.map(p => ({ ...p, e: null }))
           ];
-          enhancers.index.recordTestResults(runId, allTests);
+          await enhancers.index.recordTestResults(runId, allTests);
 
           // Enhance failures with historical data
-          enhancedFailures = enhancedFailures.map(failure => {
-            const history = enhancers.index.getTestHistory(failure.t, 5);
-            const flaky = enhancers.index.getFlakiness(failure.t);
+          enhancedFailures = await Promise.all(
+            enhancedFailures.map(async (failure) => {
+              const history = await enhancers.index.getTestHistory(failure.t, 5);
+              const flaky = await enhancers.index.getFlakiness(failure.t);
 
-            if (history.length > 0 || flaky) {
-              return {
-                ...failure,
-                history: {
-                  lastPassed: history.find(h => h.status === 'pass')?.timestamp || null,
-                  failCount: history.filter(h => h.status === 'fail').length,
-                  totalRuns: history.length,
-                  flaky
-                }
-              };
-            }
-            return failure;
-          });
+              if (history.length > 0 || flaky) {
+                return {
+                  ...failure,
+                  history: {
+                    lastPassed: history.find(h => h.status === 'pass')?.timestamp || null,
+                    failCount: history.filter(h => h.status === 'fail').length,
+                    totalRuns: history.length,
+                    flaky
+                  }
+                };
+              }
+              return failure;
+            })
+          );
         }
       }
 
