@@ -10,12 +10,15 @@ version: 1.0.0
 
 When analyzing llm-compact-logger output:
 
-1. Check for `meta.rootCauses` - patterns found across failures
-2. Review `topFails` - most common error types
-3. Examine `code` field - failing line with context
-4. Look for `history.flaky` - flakiness indicators
+1. Read `debug-compact.json` first (~18 tokens vs ~88 for full report)
+2. Check for `meta.rootCauses` - patterns found across failures (confidence >0.85 is actionable)
+3. Review `topFails` - most common error types
+4. Examine `code` field - failing line with context
+5. Look for `history.flaky` - flakiness indicators
 
-For detailed format reference and all error patterns, see [REFERENCE.md](REFERENCE.md).
+**Use jq for queries (not grep):** See [EXAMPLES.md](EXAMPLES.md) for jq query patterns.
+
+For detailed format reference and error patterns, see [REFERENCE.md](REFERENCE.md).
 
 ## Analyzing Test Output
 
@@ -70,36 +73,13 @@ Flag tests with `history.flaky.isFlaky: true`.
 ## Configuring Enhancements
 
 Ask user:
-1. **Need history tracking?** → Enable `persistentIndex`
-2. **Using coverage?** → Enable `coverage` enhancement
-3. **Have flaky tests?** → Recommend `persistentIndex`
+1. **Need history tracking?** → Enable `persistentIndex` (requires better-sqlite3)
+2. **Using coverage?** → Enable Vitest coverage with `provider: 'v8', reporter: ['json']`
+3. **Have flaky tests?** → Recommend `persistentIndex` for historical analysis
 
-### Quick Config Templates
+**Minimal setup:** `new VitestReporter({ outputDir: './debug' })`
 
-**Minimal (zero dependencies):**
-```javascript
-new VitestReporter({ outputDir: './debug' })
-```
-
-**With coverage:**
-```javascript
-test: {
-  coverage: { enabled: true, provider: 'v8', reporter: ['json'] },
-  reporters: ['default', new VitestReporter({ outputDir: './debug' })]
-}
-```
-
-**All features:**
-```javascript
-new VitestReporter({
-  outputDir: './debug',
-  enhancements: {
-    persistentIndex: { enabled: true, retentionDays: 30 }
-  }
-})
-```
-
-See [REFERENCE.md](REFERENCE.md) for complete configuration options.
+See [REFERENCE.md](REFERENCE.md) for complete configuration options and examples.
 
 ## Response Format
 
@@ -128,10 +108,9 @@ Activate when:
 
 ## Troubleshooting
 
-| Issue | Fix |
-|-------|-----|
-| "better-sqlite3 not installed" | `npm install --save-optional better-sqlite3` or disable |
-| "Coverage file not found" | Enable Vitest coverage or disable enhancement |
-| Missing enhancements | Check for v0.2.0+, verify config |
+Common issues:
+- "better-sqlite3 not installed" → Install or disable `persistentIndex`
+- "Coverage file not found" → Enable Vitest coverage with `reporter: ['json']`
+- Missing enhancements → Requires v0.2.0+
 
-For detailed troubleshooting, see [REFERENCE.md](REFERENCE.md).
+See [REFERENCE.md](REFERENCE.md) for complete troubleshooting guide.
