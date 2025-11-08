@@ -17,11 +17,11 @@ Reduces debug output token consumption by ~85-90% while maintaining full context
 ## Installation
 
 ```bash
-npm install llm-compact-logger
+npm install github:devame/llm-compact-logger
 # or
-yarn add llm-compact-logger
+yarn add github:devame/llm-compact-logger
 # or
-pnpm add llm-compact-logger
+pnpm add github:devame/llm-compact-logger
 ```
 
 ## Quick Start
