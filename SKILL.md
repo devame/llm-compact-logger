@@ -1,102 +1,43 @@
 ---
-name: analyzing-llm-compact-logger
-description: Analyzes and configures llm-compact-logger test output. Use when user shares debug-compact.json or debug-report.json files, asks about test failures, mentions llm-compact-logger configuration, or needs help interpreting compact test results from Vitest or Jest.
+name: llm-compact-logger-analysis
+description: Analyze llm-compact-logger test output and configure enhancements. Use when user shares debug-compact.json, debug-report.json, or asks about test failures.
+version: 1.0.0
 ---
 
 # LLM Compact Logger Analysis
 
 ## Overview
 
-llm-compact-logger produces token-efficient JSON test reports with abbreviated keys. This Skill helps interpret the compact format and configure the 7 enhancement features.
+This Skill helps analyze token-efficient test reports from llm-compact-logger and configure its 7 enhancement features. Claude should use this Skill whenever the user shares files ending in `debug-compact.json` or `debug-report.json`, mentions llm-compact-logger configuration, or needs help interpreting compact test failure output.
 
-## When to Apply
+## Key Format: Abbreviated JSON
 
-- User shares files ending in `debug-compact.json` or `debug-report.json`
-- User asks to analyze test failures or debug output
-- User mentions configuring llm-compact-logger or enabling enhancements
-- User references Vitest/Jest reporter configuration
+llm-compact-logger uses abbreviated keys to reduce token consumption by ~85%:
 
-## Key Abbreviations
+| Key | Meaning | Example |
+|-----|---------|---------|
+| `t` | Test name | `"should validate email"` |
+| `f` | File:line | `"auth.test.js:42"` |
+| `e` | Error details | Object with type, msg, E, R |
+| `E` | Expected value | `"valid@email.com"` |
+| `R` | Received/actual | `"invalid"` |
 
-The compact format uses these abbreviations:
+**Enhanced Format Fields** (when enhancements enabled):
 
-| Key | Meaning | Type |
-|-----|---------|------|
-| `t` | Test name | string |
-| `f` | File:line location | string |
-| `e` | Error object | object |
-| `E` | Expected value | any |
-| `R` | Received/actual value | any |
-| `stk` | Stack trace | string or array |
-| `code` | Inline code context | object |
-| `sum` | Summary statistics | object |
-| `tot` | Total tests | number |
-| `pas` | Passed tests | number |
-| `fai` | Failed tests | number |
+- `code` - Failing line with 3-line context
+- `stk` - Array of stack frames with function names + source code
+- `e.hint` - Smart diff explanation (e.g., "Type mismatch: got array but expected object")
+- `history` - Past runs, flakiness data
+- `links` - VSCode/IDEA clickable links
+- `coverage` - Functions executed during test
 
-## Enhancement Fields
+## Analyzing Reports
 
-When enhancements are enabled, failures include additional fields:
+### Step 1: Check for Root Causes
 
-**code**: Inline context with failing line
-```javascript
-{
-  "fail": "expect(result).toBe(5)",
-  "ctx": ["const result = calculate();", "expect(result).toBe(5);"],
-  "line": { "start": 26, "failing": 28, "end": 31 }
-}
-```
+Look for `meta.rootCauses` array first. If present, lead with this:
 
-**stk**: Enhanced stack with function names and source code
-```javascript
-[
-  { "fn": "expect", "at": "test.js:28", "code": "expect(...)", "test": true },
-  { "fn": "calculate", "at": "index.js:76", "code": "return x + y", "test": false }
-]
-```
-
-**e.hint**: Smart diff hint explaining mismatch
-```javascript
-{
-  "actual": "[2 items]",
-  "expected": "{value: {...}}",
-  "hint": "Type mismatch: got array but expected object"
-}
-```
-
-**history**: Test execution history from persistent index
-```javascript
-{
-  "lastPassed": "2025-01-07T10:23:45Z",
-  "failCount": 3,
-  "totalRuns": 5,
-  "flaky": { "passRate": "40.0", "isFlaky": true }
-}
-```
-
-**links**: IDE-compatible navigation links
-```javascript
-{
-  "test": { "label": "test.js", "vscode": "vscode://file/...:28" },
-  "source": { "label": "index.js", "vscode": "vscode://file/...:76" }
-}
-```
-
-**coverage**: Functions executed during test
-```javascript
-{
-  "functions": [{ "name": "parse", "file": "index.js", "line": 76 }],
-  "executionPath": [{ "fn": "parse", "file": "index.js:76" }]
-}
-```
-
-## Analyzing Debug Reports
-
-### 1. Check Root Causes First
-
-Look for `meta.rootCauses` array (added by root cause analyzer):
-
-```javascript
+```json
 {
   "meta": {
     "rootCauses": [
@@ -104,237 +45,164 @@ Look for `meta.rootCauses` array (added by root cause analyzer):
         "pattern": "Accessing property 'name' on undefined",
         "confidence": 0.95,
         "affectedTests": ["test1", "test2"],
-        "count": 2,
-        "suggestion": "Check if object exists before accessing property"
+        "suggestion": "Check if object exists before accessing"
       }
     ]
   }
 }
 ```
 
-If present, lead with this analysis. High confidence (>0.85) patterns are actionable.
+High confidence (>0.85) = actionable pattern found.
 
-### 2. Examine Error Patterns
+### Step 2: Review Error Patterns
 
-Group failures by `e.type` using `topFails`:
+Group by `topFails`:
 
-```javascript
+```json
 {
   "topFails": [
-    { "type": "TypeError", "count": 5 },
-    { "type": "AssertionError", "count": 3 }
+    {"type": "TypeError", "count": 5},
+    {"type": "AssertionError", "count": 3}
   ]
 }
 ```
 
-Common patterns and fixes:
+**Common patterns and fixes:**
 
-**TypeError: Cannot read properties of undefined**
-- Check for null/undefined before property access
-- Verify object structure matches expectations
-- Look at `e.hint` for specific guidance
+- **TypeError: Cannot read properties of undefined** → Add null checks
+- **Type mismatch (array vs object)** → API changed, check structure
+- **Array length mismatch** → Data changed or filtering issue
 
-**Type mismatch (array vs object)**
-- API may have changed return type
-- Check if accessing wrong property path
-- Review `e.actual` vs `e.expected` structure
+### Step 3: Show Code Context
 
-**Array length mismatch**
-- Data may have changed
-- Items being filtered unexpectedly
-- Test expectations may be outdated
+If `code` field exists:
 
-### 3. Review Code Context
-
-If `code` field exists, show the failing line with context:
-
-```
-Line 28: expect(result).toBe(5)
-Context:
-  const result = calculate();
-  expect(result).toBe(5);
+```json
+{
+  "code": {
+    "fail": "expect(result).toBe(5)",
+    "ctx": ["const result = calculate();", "expect(result).toBe(5);"],
+    "line": {"failing": 28}
+  }
+}
 ```
 
-### 4. Check Test History
+Display the failing line with surrounding context.
 
-If `history` exists, identify flaky tests:
+### Step 4: Check Flakiness
 
+If `history.flaky` exists:
+
+```json
+{
+  "history": {
+    "flaky": {"passRate": "40.0", "isFlaky": true},
+    "failCount": 3,
+    "totalRuns": 5
+  }
+}
 ```
-Test has failed 3 of 5 runs (40% pass rate)
-Last passed: 2025-01-07
-Status: Flaky - investigate intermittent issues
-```
 
-## Configuration Guidance
+Flag as flaky and recommend investigation.
 
-### Default Configuration (Recommended)
+## Configuring Enhancements
 
-All enhancements enabled except persistent index:
+Ask these questions to determine configuration:
 
+**1. Need test history?**
+→ Enable `persistentIndex` (requires `npm install better-sqlite3`)
+
+**2. Already using coverage?**
+→ Enable `coverage` + configure Vitest coverage
+
+**3. Using VSCode/IntelliJ?**
+→ Keep `links: true` (default)
+
+**4. Have flaky tests?**
+→ Strongly recommend `persistentIndex`
+
+### Configuration Templates
+
+**Minimal (zero extra dependencies):**
 ```javascript
-import { VitestReporter } from 'llm-compact-logger/adapters/vitest';
+new VitestReporter({ outputDir: './debug' })
+// All enhancements enabled by default except persistentIndex
+```
 
+**Recommended (with coverage):**
+```javascript
 export default {
   test: {
+    coverage: {
+      enabled: true,
+      provider: 'v8',
+      reporter: ['json'],
+      reportsDirectory: '.coverage'
+    },
     reporters: [
       'default',
       new VitestReporter({ outputDir: './debug' })
     ]
   }
-};
-```
-
-### Enhancement Decision Tree
-
-Ask these questions to determine which enhancements to enable:
-
-**Need test history tracking?**
-→ Enable `persistentIndex` (requires `npm install better-sqlite3`)
-
-**Already using coverage?**
-→ Set `coverage.useCoverage: true` and configure Vitest coverage:
-```javascript
-test: {
-  coverage: {
-    enabled: true,
-    provider: 'v8',
-    reporter: ['json'],
-    reportsDirectory: '.coverage'
-  }
 }
 ```
 
-**Using VSCode/IntelliJ?**
-→ Keep `links: true` (enabled by default)
-
-**Have flaky tests?**
-→ Enable `persistentIndex` for flakiness detection
-
-### Selective Configuration
-
-To disable specific enhancements:
-
+**Full (all features):**
 ```javascript
 new VitestReporter({
   outputDir: './debug',
   enhancements: {
-    codeContext: true,   // Keep
-    diff: true,          // Keep
-    stack: true,         // Keep
-    rootCause: true,     // Keep
-    coverage: false,     // Disable
-    links: true,         // Keep
-    persistentIndex: { enabled: false }  // Disable
-  }
-})
-```
-
-### Full Configuration
-
-All features enabled:
-
-```javascript
-new VitestReporter({
-  outputDir: './debug',
-  enhancements: {
-    codeContext: { contextLines: 3 },
-    diff: { maxDepth: 3, maxArrayItems: 5, maxObjectKeys: 5 },
-    stack: { maxFrames: 5, maxCodeLength: 80 },
-    rootCause: { minGroupSize: 2 },
-    coverage: { useCoverage: true, coverageDir: '.coverage' },
-    links: { trackGit: true },
+    codeContext: true,
+    diff: true,
+    stack: true,
+    rootCause: true,
+    coverage: true,
+    links: true,
     persistentIndex: { enabled: true, retentionDays: 30 }
   }
 })
 ```
 
-## Troubleshooting
+## Response Format
 
-### "better-sqlite3 not installed"
-User enabled `persistentIndex` without the package.
-
-Fix: `npm install --save-optional better-sqlite3`
-Or: Disable with `persistentIndex: { enabled: false }`
-
-### "Coverage file not found"
-User enabled `coverage` enhancement but no coverage data exists.
-
-Fix: Enable Vitest coverage in config (see above)
-Or: Disable with `coverage: false`
-
-### No enhancements in output
-Enhancements may be disabled or old version (pre-0.2.0).
-
-Check: Look for `code`, `stk` array, `e.hint` fields in output
-Fix: Update to version 0.2.0+ or verify configuration
-
-## Output Format Examples
-
-### Minimal failure (no enhancements):
-```json
-{
-  "t": "should validate email",
-  "f": "auth.test.js:42",
-  "e": {
-    "type": "AssertionError",
-    "msg": "expected 'invalid' to be valid email",
-    "E": "valid email",
-    "R": "invalid"
-  }
-}
-```
-
-### Enhanced failure (all features):
-```json
-{
-  "t": "should validate email",
-  "f": "auth.test.js:42",
-  "code": {
-    "fail": "expect(validate(email)).toBe(true)",
-    "ctx": [
-      "const email = 'invalid';",
-      "expect(validate(email)).toBe(true);"
-    ],
-    "line": { "failing": 42 }
-  },
-  "e": {
-    "type": "AssertionError",
-    "msg": "expected false to be true",
-    "actual": false,
-    "expected": true,
-    "hint": "Type mismatch: boolean values differ"
-  },
-  "stk": [
-    { "fn": "expect", "at": "auth.test.js:42", "test": true }
-  ],
-  "links": {
-    "test": { "vscode": "vscode://file/.../auth.test.js:42" }
-  }
-}
-```
-
-## Response Template
-
-When analyzing debug reports, structure responses as:
+Structure analysis as:
 
 ```
 📊 Summary: X tests (X passed, X failed) - X% pass rate
 
 🎯 Root Cause:
 [Pattern]: [Description] (X% confidence)
-Suggestion: [Actionable fix]
+Suggestion: [Fix]
 
 ❌ Key Failures:
-
-1. [Test name] (file:line)
+1. [Test] (file:line)
    Error: [Type] - [Message]
    Issue: [Explanation]
    Fix: [Solution]
 
-[Repeat for top 3-5 failures]
-
 💡 Next Steps:
-- [Specific action items based on analysis]
+- [Actionable items]
 ```
 
-Focus on actionable insights. Use `e.hint`, root cause patterns, and code context to provide specific fixes rather than generic advice.
+## When to Apply
+
+Use this Skill when:
+- User shares `debug-compact.json` or `debug-report.json` files
+- User asks to analyze test failures or debug output
+- User mentions configuring llm-compact-logger
+- User references Vitest reporter configuration
+- User asks about test flakiness or failure patterns
+
+## Troubleshooting
+
+**"better-sqlite3 not installed"**
+Fix: `npm install --save-optional better-sqlite3`
+Or: `persistentIndex: { enabled: false }`
+
+**"Coverage file not found"**
+Fix: Enable coverage in vitest.config.js
+Or: `coverage: false`
+
+**No enhancements in output**
+Check: Look for `code`, `stk` array, `e.hint` fields
+Fix: Update to v0.2.0+ or verify config
