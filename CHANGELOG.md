@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2025-11-08
+
+### Fixed
+
+**Critical bug fix for enhancement loading in Vitest context**
+
+- Fixed `ReferenceError: InlineCodeContextEnhancer is not defined` error when using Vitest
+- Changed `createEnhancers()` to use dynamic imports instead of static imports
+- Made enhancement loading lazy and asynchronous (happens in `onFinished` instead of `onInit`)
+- Only instantiate enhancers that are explicitly enabled (previously created all regardless of config)
+- Added graceful error handling for enhancement loading failures
+
+### Technical Details
+
+**Root Cause:** Static ES module imports in `enhancements/index.js` were not resolving properly in Vitest's runtime context, causing all enhancement classes to be undefined when `createEnhancers()` was called.
+
+**Solution:**
+1. Made `createEnhancers()` async and use dynamic imports (`await import(...)`)
+2. Moved enhancement loading from `onInit()` (sync) to `onFinished()` (async)
+3. Added conditional instantiation - only create enhancers when enabled
+4. Added try-catch wrapper for graceful degradation
+
+**Impact:** All 7 enhancements now work correctly with Vitest. Users no longer need to disable enhancements as a workaround.
+
 ## [0.2.0] - 2025-11-08
 
 ### Added - Major Enhancement Suite
