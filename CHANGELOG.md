@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2025-11-08
+
+### Fixed
+
+**ESM compatibility for persistent index (better-sqlite3)**
+
+- Fixed `require()` usage in persistent-index.js causing failures in ESM contexts
+- Converted `loadDatabase()` to async with dynamic `import()` instead of CommonJS `require()`
+- Implemented lazy initialization pattern - database loads on first use, not in constructor
+- Made all database methods async (`recordTestRun`, `recordTestResults`, `getTestHistory`, `findSimilarFailures`, `getFlakiness`)
+- Updated quick-links enhancer to handle async database queries
+- Updated vitest-adapter to properly await all async database operations
+
+### Technical Details
+
+**Root Cause:** The `loadDatabase()` method used CommonJS `require('better-sqlite3')` which fails in ESM projects even when the package is installed.
+
+**Solution:**
+1. Changed `loadDatabase()` from sync to async using `await import('better-sqlite3')`
+2. Implemented lazy initialization - `initialize()` is now called on first database use, not in constructor
+3. Added `initPromise` to prevent multiple concurrent initializations
+4. Made all database methods async and call `await this.initialize()` before accessing db
+5. Updated all callers in vitest-adapter.js to await async database operations
+
+**Impact:** Persistent index enhancement now works correctly with better-sqlite3 installed in ESM projects.
+
 ## [0.2.1] - 2025-11-08
 
 ### Fixed

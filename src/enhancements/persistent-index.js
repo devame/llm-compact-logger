@@ -24,49 +24,70 @@ export class PersistentIndex {
     this.retentionDays = options.retentionDays || 30;
     this.trackGit = options.trackGit !== false;
     this.db = null;
-
-    if (this.enabled) {
-      this.initialize();
-    }
+    this.initPromise = null;
+    this.initialized = false;
   }
 
   /**
-   * Initialize the database
+   * Initialize the database (async, called lazily on first use)
+   * @returns {Promise<boolean>} True if initialized successfully
    */
-  initialize() {
-    try {
-      // Try to load better-sqlite3
-      const Database = this.loadDatabase();
-      if (!Database) {
-        console.warn('PersistentIndex: better-sqlite3 not installed, history tracking disabled');
-        this.enabled = false;
-        return;
-      }
-
-      // Create directory if needed
-      const dir = path.dirname(this.dbPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-
-      // Open database
-      this.db = new Database(this.dbPath);
-      this.setupSchema();
-      this.cleanup();
-    } catch (error) {
-      console.warn(`PersistentIndex: Failed to initialize database: ${error.message}`);
-      this.enabled = false;
+  async initialize() {
+    if (this.initialized) {
+      return this.enabled;
     }
+
+    if (this.initPromise) {
+      await this.initPromise;
+      return this.enabled;
+    }
+
+    this.initPromise = (async () => {
+      try {
+        if (!this.enabled) {
+          this.initialized = true;
+          return;
+        }
+
+        // Try to load better-sqlite3
+        const Database = await this.loadDatabase();
+        if (!Database) {
+          console.warn('PersistentIndex: better-sqlite3 not installed, history tracking disabled');
+          this.enabled = false;
+          this.initialized = true;
+          return;
+        }
+
+        // Create directory if needed
+        const dir = path.dirname(this.dbPath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+
+        // Open database
+        this.db = new Database(this.dbPath);
+        this.setupSchema();
+        this.cleanup();
+        this.initialized = true;
+      } catch (error) {
+        console.warn(`PersistentIndex: Failed to initialize database: ${error.message}`);
+        this.enabled = false;
+        this.initialized = true;
+      }
+    })();
+
+    await this.initPromise;
+    return this.enabled;
   }
 
   /**
    * Load the better-sqlite3 module (optional dependency)
-   * @returns {Function|null} Database constructor or null
+   * @returns {Promise<Function|null>} Database constructor or null
    */
-  loadDatabase() {
+  async loadDatabase() {
     try {
-      // Dynamic import to make it optional
-      const mod = require('better-sqlite3');
+      // ESM-compatible dynamic import
+      const mod = await import('better-sqlite3');
       return mod.default || mod;
     } catch (error) {
       return null;
@@ -117,9 +138,10 @@ export class PersistentIndex {
    * Record a test run
    * @param {Object} summary - Test run summary
    * @param {Object} metadata - Additional metadata
-   * @returns {number|null} Run ID or null
+   * @returns {Promise<number|null>} Run ID or null
    */
-  recordTestRun(summary, metadata = {}) {
+  async recordTestRun(summary, metadata = {}) {
+    await this.initialize();
     if (!this.db || !this.enabled) return null;
 
     try {
@@ -152,8 +174,10 @@ export class PersistentIndex {
    * Record test results for a run
    * @param {number} runId - Run ID
    * @param {Array} tests - Test results
+   * @returns {Promise<void>}
    */
-  recordTestResults(runId, tests) {
+  async recordTestResults(runId, tests) {
+    await this.initialize();
     if (!this.db || !this.enabled || !runId) return;
 
     try {
@@ -236,9 +260,10 @@ export class PersistentIndex {
    * Get test history
    * @param {string} testName - Test name
    * @param {number} limit - Max results
-   * @returns {Array} Test history
+   * @returns {Promise<Array>} Test history
    */
-  getTestHistory(testName, limit = 10) {
+  async getTestHistory(testName, limit = 10) {
+    await this.initialize();
     if (!this.db || !this.enabled) return [];
 
     try {
@@ -261,9 +286,10 @@ export class PersistentIndex {
   /**
    * Find tests with similar failures
    * @param {string} errorHash - Error hash
-   * @returns {Array} Similar failures
+   * @returns {Promise<Array>} Similar failures
    */
-  findSimilarFailures(errorHash) {
+  async findSimilarFailures(errorHash) {
+    await this.initialize();
     if (!this.db || !this.enabled || !errorHash) return [];
 
     try {
@@ -287,9 +313,10 @@ export class PersistentIndex {
    * Calculate test flakiness
    * @param {string} testName - Test name
    * @param {number} windowDays - Time window in days
-   * @returns {Object|null} Flakiness stats
+   * @returns {Promise<Object|null>} Flakiness stats
    */
-  getFlakiness(testName, windowDays = 7) {
+  async getFlakiness(testName, windowDays = 7) {
+    await this.initialize();
     if (!this.db || !this.enabled) return null;
 
     try {
