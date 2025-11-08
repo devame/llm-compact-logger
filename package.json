@@ -1,0 +1,59 @@
+{
+  "name": "llm-compact-logger",
+  "version": "0.1.0",
+  "description": "Generic token-efficient logger for LLM debugging - framework agnostic",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./adapters/vitest": "./src/adapters/vitest-adapter.js",
+    "./adapters/jest": "./src/adapters/jest-adapter.js",
+    "./adapters/base": "./src/adapters/base-adapter.js"
+  },
+  "scripts": {
+    "test": "echo \"Tests coming soon\" && exit 0"
+  },
+  "keywords": [
+    "llm",
+    "ai",
+    "debugging",
+    "logger",
+    "test",
+    "vitest",
+    "jest",
+    "token-efficient",
+    "compact",
+    "reporter"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/devame/llm-compact-logger.git"
+  },
+  "bugs": {
+    "url": "https://github.com/devame/llm-compact-logger/issues"
+  },
+  "homepage": "https://github.com/devame/llm-compact-logger#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "files": [
+    "src/",
+    "examples/",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "vitest": ">=0.30.0",
+    "jest": ">=27.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    },
+    "jest": {
+      "optional": true
+    }
+  }
+}
